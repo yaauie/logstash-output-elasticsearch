@@ -1,3 +1,6 @@
+## 10.6.0
+ - Added support for `host` to be populated with space-separated values, effectively enabling environment or keystore variables to be used to specify an arbitrary number of hosts.
+
 ## 10.5.1
   - [DOC] Removed outdated compatibility notices, reworked cloud notice, and fixed formatting for `hosts` examples [#938](https://github.com/logstash-plugins/logstash-output-elasticsearch/pull/938)
 

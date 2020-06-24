@@ -432,6 +432,7 @@ If you have custom firewall rules you may need to change this
   * Default value is `[//127.0.0.1]`
 
 Sets the host(s) of the remote instance. If given an array it will load balance requests across the hosts specified in the `hosts` parameter.
+Entries that include whitespace will be split into multiple entries.
 Remember the `http` protocol uses the http://www.elastic.co/guide/en/elasticsearch/reference/current/modules-http.html#modules-http[http] address (eg. 9200, not 9300).
 
 Examples:
@@ -441,11 +442,13 @@ Examples:
     `["http://127.0.0.1"]`
     `["https://127.0.0.1:9200"]`
     `["https://127.0.0.1:9200/mypath"]` (If using a proxy on a subpath)
+    `"127.0.0.1:9200 127.0.0.2:9200"`
 
 It is important to exclude http://www.elastic.co/guide/en/elasticsearch/reference/current/modules-node.html[dedicated master nodes] from the `hosts` list
 to prevent LS from sending bulk requests to the master nodes.  So this parameter should only reference either data or client nodes in Elasticsearch.
 
 Any special characters present in the URLs here MUST be URL escaped! This means `#` should be put in as `%23` for instance.
+When literal whitespace is present in a given URL entry, that entry is split into multiple entries; this empowers the plugin to support a list of hosts provided by environment or keystore variable.
 
 [id="plugins-{type}s-{plugin}-http_compression"]
 ===== `http_compression` 

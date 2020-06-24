@@ -530,6 +530,28 @@ describe LogStash::Outputs::ElasticSearch do
           expect(manticore_url.query).to eql("#{existing_query_string}&#{custom_parameters_query}")
         end
       end
+
+      context 'hosts specification' do
+        {
+          'multi-element array of atomic host urls' => ["localhost:9200","localhost:9201","127.0.0.1:9202"],
+          'whitespace-delimited host urls as single-element array' => ["localhost:9200 localhost:9201 127.0.0.1:9202"],
+          'whitespace-delimited host urls as single string' => "localhost:9200 localhost:9201 127.0.0.1:9202",
+          'array containing a mix of atomic and whitespace-delimited urls' => ["localhost:9200","localhost:9201 127.0.0.1:9202"]
+        }.each do |desc, hosts_value|
+          context desc do
+            let(:options) { {"hosts" => hosts_value} }
+
+            it 'includes all specified URLs in the Manticore pool' do
+              expect(manticore_urls.size).to eq(3)
+
+              manticore_urls_as_strings = manticore_urls.map(&:to_s)
+              expect(manticore_urls_as_strings).to include('http://localhost:9200/')
+              expect(manticore_urls_as_strings).to include('http://localhost:9201/')
+              expect(manticore_urls_as_strings).to include('http://127.0.0.1:9202/')
+            end
+          end
+        end
+      end
     end
   end
 

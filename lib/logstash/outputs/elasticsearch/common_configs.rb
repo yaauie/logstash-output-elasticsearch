@@ -97,7 +97,8 @@ module LogStash; module Outputs; class ElasticSearch
       # to prevent LS from sending bulk requests to the master nodes.  So this parameter should only reference either data or client nodes in Elasticsearch.
       #
       # Any special characters present in the URLs here MUST be URL escaped! This means `#` should be put in as `%23` for instance.
-      mod.config :hosts, :validate => :uri, :default => [ DEFAULT_HOST ], :list => true
+      mod.config :hosts, :validate => :whitespace_delimited_uri_list, :default => [ DEFAULT_HOST ]
+      mod.extend(WhitespaceDelimitedURIListValidator)
 
       # Cloud ID, from the Elastic Cloud web console. If set `hosts` should not be used.
       #
@@ -162,6 +163,27 @@ module LogStash; module Outputs; class ElasticSearch
       # ILM policy to use, if undefined the default policy will be used.
       mod.config :ilm_policy, :validate => :string, :default => DEFAULT_POLICY
 
+    end
+
+    module WhitespaceDelimitedURIListValidator
+      def validate_value(value, validator)
+        return super unless validator == :whitespace_delimited_uri_list
+
+        value = deep_replace(value)
+        value = hash_or_array(value)
+
+        value = value.flat_map do |entry|
+          entry.kind_of?(String) ? entry.split(' ') : entry
+        end
+
+        valid, invalid = value.map do |entry|
+          super(entry, :uri)
+        end.partition(&:first).map { |group| group.map(&:last) }
+
+        return [false, invalid] if invalid.any?
+
+        [true, valid]
+      end
     end
   end
 end end end
