@@ -1,15 +1,23 @@
-require 'forwardable' # Needed for logstash core SafeURI. We need to patch this in core: https://github.com/elastic/logstash/pull/5978
-
 module LogStash; module Outputs; class ElasticSearch
-  module CommonConfigs
+  module ElasticsearchConfigs
 
-    DEFAULT_INDEX_NAME = "logstash-%{+yyyy.MM.dd}"
     DEFAULT_POLICY = "logstash-policy"
-    DEFAULT_ROLLOVER_ALIAS = 'logstash'
-
-    DEFAULT_HOST = ::LogStash::Util::SafeURI.new("//127.0.0.1")
 
     def self.included(mod)
+      # The Elasticsearch action to perform. Valid actions are:
+      #
+      # - index: indexes a document (an event from Logstash).
+      # - delete: deletes a document by id (An id is required for this action)
+      # - create: indexes a document, fails if a document by that id already exists in the index.
+      # - update: updates a document by id. Update has a special case where you can upsert -- update a
+      #   document if not already present. See the `upsert` option. NOTE: This does not work and is not supported
+      #   in Elasticsearch 1.x. Please upgrade to ES 2.x or greater to use this feature with Logstash!
+      # - A sprintf style string to change the action based on the content of the event. The value `%{[foo]}`
+      #   would use the foo field for the action
+      #
+      # For more details on actions, check out the http://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html[Elasticsearch bulk API documentation]
+      mod.config :action, :validate => :string, :default => "index"
+
       # The index to write events to. This can be dynamic using the `%{foo}` syntax.
       # The default value will partition your indices by day so you can more easily
       # delete old data or only search specific date ranges.
@@ -69,7 +77,7 @@ module LogStash; module Outputs; class ElasticSearch
       # The version to use for indexing. Use sprintf syntax like `%{my_version}` to use a field value here.
       # See https://www.elastic.co/blog/elasticsearch-versioning-support.
       mod.config :version, :validate => :string
-      
+
       # The version_type to use for indexing.
       # See https://www.elastic.co/blog/elasticsearch-versioning-support.
       # See also https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-index_.html#_version_types
@@ -85,24 +93,6 @@ module LogStash; module Outputs; class ElasticSearch
 
       # For child documents, name of the join field
       mod.config :join_field, :validate => :string, :default => nil
-
-      # Sets the host(s) of the remote instance. If given an array it will load balance requests across the hosts specified in the `hosts` parameter.
-      # Remember the `http` protocol uses the http://www.elastic.co/guide/en/elasticsearch/reference/current/modules-http.html#modules-http[http] address (eg. 9200, not 9300).
-      #     `"127.0.0.1"`
-      #     `["127.0.0.1:9200","127.0.0.2:9200"]`
-      #     `["http://127.0.0.1"]`
-      #     `["https://127.0.0.1:9200"]`
-      #     `["https://127.0.0.1:9200/mypath"]` (If using a proxy on a subpath)
-      # It is important to exclude http://www.elastic.co/guide/en/elasticsearch/reference/current/modules-node.html[dedicated master nodes] from the `hosts` list
-      # to prevent LS from sending bulk requests to the master nodes.  So this parameter should only reference either data or client nodes in Elasticsearch.
-      #
-      # Any special characters present in the URLs here MUST be URL escaped! This means `#` should be put in as `%23` for instance.
-      mod.config :hosts, :validate => :uri, :default => [ DEFAULT_HOST ], :list => true
-
-      # Cloud ID, from the Elastic Cloud web console. If set `hosts` should not be used.
-      #
-      # For more details, check out the https://www.elastic.co/guide/en/logstash/current/connecting-to-cloud.html#_cloud_id[cloud documentation]
-      mod.config :cloud_id, :validate => :string
 
       # Set upsert content for update mode.s
       # Create a new document with this parameter as json string if `document_id` doesn't exists
@@ -130,12 +120,6 @@ module LogStash; module Outputs; class ElasticSearch
       # if enabled, script is in charge of creating non-existent document (scripted update)
       mod.config :scripted_upsert, :validate => :boolean, :default => false
 
-      # Set initial interval in seconds between bulk retries. Doubled on each retry up to `retry_max_interval`
-      mod.config :retry_initial_interval, :validate => :number, :default => 2
-
-      # Set max interval in seconds between bulk retries.
-      mod.config :retry_max_interval, :validate => :number, :default => 64
-
       # The number of times Elasticsearch should internally retry an update/upserted document
       # See the https://www.elastic.co/guide/en/elasticsearch/guide/current/partial-updates.html[partial updates]
       # for more info
@@ -144,7 +128,6 @@ module LogStash; module Outputs; class ElasticSearch
       # Set which ingest pipeline you wish to execute for an event. You can also use event dependent configuration
       # here like `pipeline => "%{INGEST_PIPELINE}"`
       mod.config :pipeline, :validate => :string, :default => nil
-
 
       # -----
       # ILM configurations (beta)
@@ -164,4 +147,4 @@ module LogStash; module Outputs; class ElasticSearch
 
     end
   end
-end end end
+end; end; end
