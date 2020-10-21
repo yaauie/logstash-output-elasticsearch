@@ -88,18 +88,10 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
 
   require "logstash/outputs/elasticsearch/http_client"
   require "logstash/outputs/elasticsearch/http_client_builder"
-  require "logstash/outputs/elasticsearch/elasticsearch_configs"
-  require "logstash/outputs/elasticsearch/shared_configs"
+  require "logstash/outputs/elasticsearch/api_configs"
   require "logstash/outputs/elasticsearch/common"
   require "logstash/outputs/elasticsearch/ilm"
-
   require 'logstash/plugin_mixins/ecs_compatibility_support'
-
-  # Elasticsearch output only configs
-  include(LogStash::Outputs::ElasticSearch::ElasticsearchConfigs)
-
-  # Shared configs with data_streams output
-  include(LogStash::Outputs::ElasticSearch::SharedConfigs)
 
   # Protocol agnostic methods
   include(LogStash::Outputs::ElasticSearch::Common)
@@ -110,7 +102,153 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
   # ecs_compatibility option, provided by Logstash core or the support adapter.
   include(LogStash::PluginMixins::ECSCompatibilitySupport)
 
+  # Generic/API config options that the data streams output will share
+  include(LogStash::Outputs::ElasticSearch::APIConfigs)
+
+  DEFAULT_POLICY = "logstash-policy"
+
   config_name "elasticsearch"
+
+  # The Elasticsearch action to perform. Valid actions are:
+  #
+  # - index: indexes a document (an event from Logstash).
+  # - delete: deletes a document by id (An id is required for this action)
+  # - create: indexes a document, fails if a document by that id already exists in the index.
+  # - update: updates a document by id. Update has a special case where you can upsert -- update a
+  #   document if not already present. See the `upsert` option. NOTE: This does not work and is not supported
+  #   in Elasticsearch 1.x. Please upgrade to ES 2.x or greater to use this feature with Logstash!
+  # - A sprintf style string to change the action based on the content of the event. The value `%{[foo]}`
+  #   would use the foo field for the action
+  #
+  # For more details on actions, check out the http://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html[Elasticsearch bulk API documentation]
+  config :action, :validate => :string, :default => "index"
+
+  # The index to write events to. This can be dynamic using the `%{foo}` syntax.
+  # The default value will partition your indices by day so you can more easily
+  # delete old data or only search specific date ranges.
+  # Indexes may not contain uppercase characters.
+  # For weekly indexes ISO 8601 format is recommended, eg. logstash-%{+xxxx.ww}.
+  # LS uses Joda to format the index pattern from event timestamp.
+  # Joda formats are defined http://www.joda.org/joda-time/apidocs/org/joda/time/format/DateTimeFormat.html[here].
+  config :index, :validate => :string
+
+  config :document_type,
+    :validate => :string,
+    :deprecated => "Document types are being deprecated in Elasticsearch 6.0, and removed entirely in 7.0. You should avoid this feature"
+
+  # From Logstash 1.3 onwards, a template is applied to Elasticsearch during
+  # Logstash's startup if one with the name `template_name` does not already exist.
+  # By default, the contents of this template is the default template for
+  # `logstash-%{+YYYY.MM.dd}` which always matches indices based on the pattern
+  # `logstash-*`.  Should you require support for other index names, or would like
+  # to change the mappings in the template in general, a custom template can be
+  # specified by setting `template` to the path of a template file.
+  #
+  # Setting `manage_template` to false disables this feature.  If you require more
+  # control over template creation, (e.g. creating indices dynamically based on
+  # field names) you should set `manage_template` to false and use the REST
+  # API to apply your templates manually.
+  config :manage_template, :validate => :boolean, :default => true
+
+  # This configuration option defines how the template is named inside Elasticsearch.
+  # Note that if you have used the template management features and subsequently
+  # change this, you will need to prune the old template manually, e.g.
+  #
+  # `curl -XDELETE <http://localhost:9200/_template/OldTemplateName?pretty>`
+  #
+  # where `OldTemplateName` is whatever the former setting was.
+  config :template_name, :validate => :string
+
+  # You can set the path to your own template here, if you so desire.
+  # If not set, the included template will be used.
+  config :template, :validate => :path
+
+  # The template_overwrite option will always overwrite the indicated template
+  # in Elasticsearch with either the one indicated by template or the included one.
+  # This option is set to false by default. If you always want to stay up to date
+  # with the template provided by Logstash, this option could be very useful to you.
+  # Likewise, if you have your own template file managed by puppet, for example, and
+  # you wanted to be able to update it regularly, this option could help there as well.
+  #
+  # Please note that if you are using your own customized version of the Logstash
+  # template (logstash), setting this to true will make Logstash to overwrite
+  # the "logstash" template (i.e. removing all customized settings)
+  config :template_overwrite, :validate => :boolean, :default => false
+
+  # The document ID for the index. Useful for overwriting existing entries in
+  # Elasticsearch with the same ID.
+  config :document_id, :validate => :string
+
+  # The version to use for indexing. Use sprintf syntax like `%{my_version}` to use a field value here.
+  # See https://www.elastic.co/blog/elasticsearch-versioning-support.
+  config :version, :validate => :string
+
+  # The version_type to use for indexing.
+  # See https://www.elastic.co/blog/elasticsearch-versioning-support.
+  # See also https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-index_.html#_version_types
+  config :version_type, :validate => ["internal", 'external', "external_gt", "external_gte", "force"]
+
+  # A routing override to be applied to all processed events.
+  # This can be dynamic using the `%{foo}` syntax.
+  config :routing, :validate => :string
+
+  # For child documents, ID of the associated parent.
+  # This can be dynamic using the `%{foo}` syntax.
+  config :parent, :validate => :string, :default => nil
+
+  # For child documents, name of the join field
+  config :join_field, :validate => :string, :default => nil
+
+  # Set upsert content for update mode.s
+  # Create a new document with this parameter as json string if `document_id` doesn't exists
+  config :upsert, :validate => :string, :default => ""
+
+  # Enable `doc_as_upsert` for update mode.
+  # Create a new document with source if `document_id` doesn't exist in Elasticsearch
+  config :doc_as_upsert, :validate => :boolean, :default => false
+
+  # Set script name for scripted update mode
+  config :script, :validate => :string, :default => ""
+
+  # Define the type of script referenced by "script" variable
+  #  inline : "script" contains inline script
+  #  indexed : "script" contains the name of script directly indexed in elasticsearch
+  #  file    : "script" contains the name of script stored in elasticseach's config directory
+  config :script_type, :validate => ["inline", 'indexed', "file"], :default => ["inline"]
+
+  # Set the language of the used script. If not set, this defaults to painless in ES 5.0
+  config :script_lang, :validate => :string, :default => "painless"
+
+  # Set variable name passed to script (scripted update)
+  config :script_var_name, :validate => :string, :default => "event"
+
+  # if enabled, script is in charge of creating non-existent document (scripted update)
+  config :scripted_upsert, :validate => :boolean, :default => false
+
+  # The number of times Elasticsearch should internally retry an update/upserted document
+  # See the https://www.elastic.co/guide/en/elasticsearch/guide/current/partial-updates.html[partial updates]
+  # for more info
+  config :retry_on_conflict, :validate => :number, :default => 1
+
+  # Set which ingest pipeline you wish to execute for an event. You can also use event dependent configuration
+  # here like `pipeline => "%{INGEST_PIPELINE}"`
+  config :pipeline, :validate => :string, :default => nil
+
+  # -----
+  # ILM configurations (beta)
+  # -----
+  # Flag for enabling Index Lifecycle Management integration.
+  config :ilm_enabled, :validate => [true, false, 'true', 'false', 'auto'], :default => 'auto'
+
+  # Rollover alias used for indexing data. If rollover alias doesn't exist, Logstash will create it and map it to the relevant index
+  config :ilm_rollover_alias, :validate => :string
+
+  # appends “{now/d}-000001” by default for new index creation, subsequent rollover indices will increment based on this pattern i.e. “000002”
+  # {now/d} is date math, and will insert the appropriate value automatically.
+  config :ilm_pattern, :validate => :string, :default => '{now/d}-000001'
+
+  # ILM policy to use, if undefined the default policy will be used.
+  config :ilm_policy, :validate => :string, :default => DEFAULT_POLICY
 
   def initialize(*params)
     super
@@ -188,5 +326,4 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
     name = plugin.name.split('-')[-1]
     require "logstash/outputs/elasticsearch/#{name}"
   end
-
 end

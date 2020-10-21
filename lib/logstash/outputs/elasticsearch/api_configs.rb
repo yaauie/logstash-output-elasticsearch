@@ -1,7 +1,7 @@
 require 'forwardable' # Needed for logstash core SafeURI. We need to patch this in core: https://github.com/elastic/logstash/pull/5978
 
 module LogStash; module Outputs; class ElasticSearch
-  module SharedConfigs
+  module APIConfigs
 
     DEFAULT_HOST = ::LogStash::Util::SafeURI.new("//127.0.0.1")
 
