@@ -20,7 +20,7 @@ module LogStash; module Outputs; class ElasticSearch
 
       # The document ID for the index. Useful for overwriting existing entries in
       # Elasticsearch with the same ID.
-      config :document_id, :validate => :string
+      mod.config :document_id, :validate => :string
 
       # HTTP Path at which the Elasticsearch server lives. Use this if you must run Elasticsearch behind a proxy that remaps
       # the root path for the Elasticsearch HTTP API lives.
