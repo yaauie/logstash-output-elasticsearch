@@ -246,9 +246,83 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
   # ILM policy to use, if undefined the default policy will be used.
   config :ilm_policy, :validate => :string, :default => DEFAULT_POLICY
 
+  attr_reader :default_index
+  attr_reader :default_ilm_rollover_alias
+  attr_reader :default_template_name
+
   def initialize(*params)
     super
     setup_ecs_compatibility_related_defaults
+  end
+
+  def register
+    @template_installed = Concurrent::AtomicBoolean.new(false)
+    @stopping = Concurrent::AtomicBoolean.new(false)
+    # To support BWC, we check if DLQ exists in core (< 5.4). If it doesn't, we use nil to resort to previous behavior.
+    @dlq_writer = dlq_enabled? ? execution_context.dlq_writer : nil
+    build_client
+    setup_after_successful_connection
+    check_action_validity
+    @bulk_request_metrics = metric.namespace(:bulk_requests)
+    @document_level_metrics = metric.namespace(:documents)
+    @logger.info("New Elasticsearch output", :class => self.class.name, :hosts => @hosts.map(&:sanitized).map(&:to_s))
+  end
+
+  # @override to handle proxy => '' as if none was set
+  def config_init(params)
+    proxy = params['proxy']
+    if proxy.is_a?(String)
+      # environment variables references aren't yet resolved
+      proxy = deep_replace(proxy)
+      if proxy.empty?
+        params.delete('proxy')
+        @proxy = ''
+      else
+        params['proxy'] = proxy # do not do resolving again
+      end
+    end
+    super(params)
+  end
+
+  # Receive an array of events and immediately attempt to index them (no buffering)
+  def multi_receive(events)
+    until @template_installed.true?
+      sleep 1
+    end
+    retrying_submit(events.map {|e| event_action_tuple(e)})
+  end
+
+  def close
+    @stopping.make_true if @stopping
+    stop_template_installer
+    @client.close if @client
+  end
+
+  def self.oss?
+    LogStash::OSS
+  end
+
+  private
+
+  def install_template
+    TemplateManager.install_template(self)
+    @template_installed.make_true
+  end
+
+  def setup_after_successful_connection
+    @template_installer ||= Thread.new do
+      sleep_interval = @retry_initial_interval
+      until successful_connection? || @stopping.true?
+        @logger.debug("Waiting for connectivity to Elasticsearch cluster. Retrying in #{sleep_interval}s")
+        Stud.stoppable_sleep(sleep_interval) { @stopping.true? }
+        sleep_interval = next_sleep_interval(sleep_interval)
+      end
+      if successful_connection?
+        discover_cluster_uuid
+        install_template
+        setup_ilm if ilm_in_use?
+      end
+    end
   end
 
   def setup_ecs_compatibility_related_defaults
@@ -270,50 +344,19 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
     @template_name ||= default_template_name
   end
 
-  attr_reader :default_index
-  attr_reader :default_ilm_rollover_alias
-  attr_reader :default_template_name
-
-  # @override to handle proxy => '' as if none was set
-  def config_init(params)
-    proxy = params['proxy']
-    if proxy.is_a?(String)
-      # environment variables references aren't yet resolved
-      proxy = deep_replace(proxy)
-      if proxy.empty?
-        params.delete('proxy')
-        @proxy = ''
-      else
-        params['proxy'] = proxy # do not do resolving again
-      end
-    end
-    super(params)
+  def stop_template_installer
+    @template_installer.join unless @template_installer.nil?
   end
 
-  def build_client
-    # the following 3 options validation & setup methods are called inside build_client
-    # because they must be executed prior to building the client and logstash
-    # monitoring and management rely on directly calling build_client
-    # see https://github.com/logstash-plugins/logstash-output-elasticsearch/pull/934#pullrequestreview-396203307
-    validate_authentication
-    fill_hosts_from_cloud_id
-    setup_hosts
 
-    params["metric"] = metric
-    if @proxy.eql?('')
-      @logger.warn "Supplied proxy setting (proxy => '') has no effect"
-    end
-    @client ||= ::LogStash::Outputs::ElasticSearch::HttpClientBuilder.build(@logger, @hosts, params)
-  end
+  def check_action_validity
+    raise LogStash::ConfigurationError, "No action specified!" unless @action
 
-  def close
-    @stopping.make_true if @stopping
-    stop_template_installer
-    @client.close if @client
-  end
+    # If we're using string interpolation, we're good!
+    return if @action =~ /%{.+}/
+    return if valid_actions.include?(@action)
 
-  def self.oss?
-    LogStash::OSS
+    raise LogStash::ConfigurationError, "Action '#{@action}' is invalid! Pick one of #{valid_actions} or use a sprintf style statement"
   end
 
   @@plugins = Gem::Specification.find_all{|spec| spec.name =~ /logstash-output-elasticsearch-/ }
