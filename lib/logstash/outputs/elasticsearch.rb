@@ -175,10 +175,6 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
   # the "logstash" template (i.e. removing all customized settings)
   config :template_overwrite, :validate => :boolean, :default => false
 
-  # The document ID for the index. Useful for overwriting existing entries in
-  # Elasticsearch with the same ID.
-  config :document_id, :validate => :string
-
   # The version to use for indexing. Use sprintf syntax like `%{my_version}` to use a field value here.
   # See https://www.elastic.co/blog/elasticsearch-versioning-support.
   config :version, :validate => :string

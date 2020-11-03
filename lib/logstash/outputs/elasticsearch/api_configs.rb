@@ -20,6 +20,10 @@ module LogStash; module Outputs; class ElasticSearch
       # For more details, check out the https://www.elastic.co/guide/en/logstash/current/connecting-to-cloud.html#_cloud_auth[cloud documentation]
       mod.config :cloud_auth, :validate => :password
 
+      # The document ID for the index. Useful for overwriting existing entries in
+      # Elasticsearch with the same ID.
+      config :document_id, :validate => :string
+
       # HTTP Path at which the Elasticsearch server lives. Use this if you must run Elasticsearch behind a proxy that remaps
       # the root path for the Elasticsearch HTTP API lives.
       # Note that if you use paths as components of URLs in the 'hosts' field you may
