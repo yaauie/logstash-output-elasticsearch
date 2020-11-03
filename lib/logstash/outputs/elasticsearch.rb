@@ -102,7 +102,7 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
   # ecs_compatibility option, provided by Logstash core or the support adapter.
   include(LogStash::PluginMixins::ECSCompatibilitySupport)
 
-  # Generic/API config options that the data streams output will share
+  # Generic/API config options that any document indexer output needs
   include(LogStash::Outputs::ElasticSearch::APIConfigs)
 
   DEFAULT_POLICY = "logstash-policy"
