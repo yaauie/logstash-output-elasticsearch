@@ -70,10 +70,6 @@ module LogStash; module Outputs; class ElasticSearch; class HttpClient;
       @stopping = false
     end
 
-    def oss?
-      LogStash::OSS
-    end
-    
     def start
       update_initial_urls
       start_resurrectionist
@@ -212,7 +208,6 @@ module LogStash; module Outputs; class ElasticSearch; class HttpClient;
       end
     end
 
-
     def sniff_2x_1x(nodes)
       nodes.map do |id,info|
         # TODO Make sure this works with shield. Does that listed
@@ -252,13 +247,6 @@ module LogStash; module Outputs; class ElasticSearch; class HttpClient;
       LogStash::Json.load(response.body)
     end
 
-    def valid_es_license?(url)
-      license = get_license(url)
-      license.fetch("license", {}).fetch("status", nil) == "active"
-    rescue => e
-      false
-    end
-
     def health_check_request(url)
       perform_request_to_url(url, :head, @healthcheck_path)
     end
@@ -285,9 +273,9 @@ module LogStash; module Outputs; class ElasticSearch; class HttpClient;
               set_new_major_version(major)
             end
 
-            # defined in license_check.rb
+            # license_check in mixed in from LogStash::Outputs::ElasticSearchPoolMixin::LicenseChecker
+            # separately defined in the elasticsearch output and the elasticsearch_data_streams output.
             license_check!(url, meta)
-
           end
         rescue HostUnreachableError, BadResponseCodeError => e
           logger.warn("Attempted to resurrect connection to dead ES instance, but got an error.", url: url.sanitized.to_s, error_type: e.class, error: e.message)
@@ -297,10 +285,6 @@ module LogStash; module Outputs; class ElasticSearch; class HttpClient;
 
     def stop_resurrectionist
       @resurrectionist.join if @resurrectionist
-    end
-
-    def log_license_deprecation_warn(url)
-      logger.warn("DEPRECATION WARNING: Connecting to an OSS distribution of Elasticsearch using the default distribution of Logstash will stop working in Logstash 8.0.0. Please upgrade to the default distribution of Elasticsearch, or use the OSS distribution of Logstash", :url => url.sanitized.to_s)
     end
 
     def resurrectionist_alive?

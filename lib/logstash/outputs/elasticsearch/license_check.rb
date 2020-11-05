@@ -4,8 +4,10 @@ module LogStash
       module LicenseChecker
 
         # This mixin is used to externalize the license checking behaviour of the LogStash::Outputs::ElasticSearch::HttpClient::Pool class.
+        # This mixin used the following Pool methods: get_license, logger. Make sure these are defined in the license_check_mixin_spec.rb
 
         # Perform a license check
+        # The license_check! methods is the method called from within the Pool class
         # @param url [LogStash::Util::SafeURI]
         # @param meta [Hash]
         def license_check!(url, meta)
@@ -22,6 +24,21 @@ module LogStash
             log_license_deprecation_warn(url)
             meta[:state] = :alive
           end
+        end
+
+        def oss?
+          LogStash::OSS
+        end
+
+        def valid_es_license?(url)
+          license = get_license(url)
+          license.fetch("license", {}).fetch("status", nil) == "active"
+        rescue => e
+          false
+        end
+
+        def log_license_deprecation_warn(url)
+          logger.warn("DEPRECATION WARNING: Connecting to an OSS distribution of Elasticsearch using the default distribution of Logstash will stop working in Logstash 8.0.0. Please upgrade to the default distribution of Elasticsearch, or use the OSS distribution of Logstash", :url => url.sanitized.to_s)
         end
       end
     end
