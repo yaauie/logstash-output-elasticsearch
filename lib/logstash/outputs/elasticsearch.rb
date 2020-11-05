@@ -299,6 +299,18 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
     @client.close if @client
   end
 
+  # not private because used by ILM specs
+  def stop_template_installer
+    @template_installer.join unless @template_installer.nil?
+  end
+
+  @@plugins = Gem::Specification.find_all{|spec| spec.name =~ /logstash-output-elasticsearch-/ }
+
+  @@plugins.each do |plugin|
+    name = plugin.name.split('-')[-1]
+    require "logstash/outputs/elasticsearch/#{name}"
+  end
+
   private
 
   def build_event_index(event)
@@ -345,11 +357,6 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
     @template_name ||= default_template_name
   end
 
-  def stop_template_installer
-    @template_installer.join unless @template_installer.nil?
-  end
-
-
   def check_action_validity
     raise LogStash::ConfigurationError, "No action specified!" unless @action
 
@@ -358,12 +365,5 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
     return if valid_actions.include?(@action)
 
     raise LogStash::ConfigurationError, "Action '#{@action}' is invalid! Pick one of #{valid_actions} or use a sprintf style statement"
-  end
-
-  @@plugins = Gem::Specification.find_all{|spec| spec.name =~ /logstash-output-elasticsearch-/ }
-
-  @@plugins.each do |plugin|
-    name = plugin.name.split('-')[-1]
-    require "logstash/outputs/elasticsearch/#{name}"
   end
 end
