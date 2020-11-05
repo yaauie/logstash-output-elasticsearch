@@ -28,6 +28,8 @@ module LogStash; module Outputs; class ElasticSearch; class HttpClient;
       end
     end
 
+    include(LogStash::Outputs::ElasticSearchPoolMixin::LicenseChecker)
+
     attr_reader :logger, :adapter, :sniffing, :sniffer_delay, :resurrect_delay, :healthcheck_path, :sniffing_path, :bulk_path
 
     ROOT_URI_PATH = '/'.freeze
@@ -69,7 +71,7 @@ module LogStash; module Outputs; class ElasticSearch; class HttpClient;
     end
 
     def oss?
-     LogStash::Outputs::ElasticSearch.oss?
+      LogStash::OSS
     end
     
     def start
@@ -282,19 +284,10 @@ module LogStash; module Outputs; class ElasticSearch; class HttpClient;
               @logger.warn("Detected a node with a higher major version than previously observed. This could be the result of an elasticsearch cluster upgrade.", :previous_major => @maximum_seen_major_version, :new_major => major, :node_url => url.sanitized.to_s)
               set_new_major_version(major)
             end
-            if oss? || valid_es_license?(url)
-              meta[:state] = :alive
-            else
-              # As this version is to be shipped with Logstash 7.x we won't mark the connection as unlicensed
-              #
-              #  logger.error("Cannot connect to the Elasticsearch cluster configured in the Elasticsearch output. Logstash requires the default distribution of Elasticsearch. Please update to the default distribution of Elasticsearch for full access to all free features, or switch to the OSS distribution of Logstash.", :url => url.sanitized.to_s)
-              #  meta[:state] = :unlicensed
-              #
-              # Instead we'll log a deprecation warning and mark it as alive:
-              #
-              log_license_deprecation_warn(url)
-              meta[:state] = :alive
-            end
+
+            # defined in license_check.rb
+            license_check!(url, meta)
+
           end
         rescue HostUnreachableError, BadResponseCodeError => e
           logger.warn("Attempted to resurrect connection to dead ES instance, but got an error.", url: url.sanitized.to_s, error_type: e.class, error: e.message)

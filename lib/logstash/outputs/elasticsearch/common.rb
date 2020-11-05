@@ -32,7 +32,7 @@ module LogStash; module Outputs; class ElasticSearch;
 
       params = {
         :_id => @document_id ? event.sprintf(@document_id) : nil,
-        :_index => event.sprintf(@index),
+        :_index => build_event_index(event),
         routing_field_name => @routing ? event.sprintf(@routing) : nil
       }
 

@@ -86,6 +86,7 @@ require "forwardable"
 class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
   declare_threadsafe!
 
+  require "logstash/outputs/elasticsearch/license_check"
   require "logstash/outputs/elasticsearch/http_client"
   require "logstash/outputs/elasticsearch/http_client_builder"
   require "logstash/outputs/elasticsearch/api_configs"
@@ -298,11 +299,11 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
     @client.close if @client
   end
 
-  def self.oss?
-    LogStash::OSS
-  end
-
   private
+
+  def build_event_index(event)
+    event.sprintf(@index)
+  end
 
   def install_template
     TemplateManager.install_template(self)
