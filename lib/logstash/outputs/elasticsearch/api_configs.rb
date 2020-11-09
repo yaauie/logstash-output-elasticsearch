@@ -1,6 +1,8 @@
 module LogStash; module Outputs; class ElasticSearch
   module APIConfigs
 
+    # This module defines common options that can be reused by alternate elasticsearch output plugins such as the elasticsearch_data_streams output.
+
     DEFAULT_HOST = ::LogStash::Util::SafeURI.new("//127.0.0.1")
 
     def self.included(mod)
@@ -156,7 +158,6 @@ module LogStash; module Outputs; class ElasticSearch
 
       # Set max interval in seconds between bulk retries.
       mod.config :retry_max_interval, :validate => :number, :default => 64
-
     end
   end
 end; end; end
