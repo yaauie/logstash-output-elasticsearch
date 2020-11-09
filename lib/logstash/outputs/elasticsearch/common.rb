@@ -2,6 +2,9 @@ require "logstash/outputs/elasticsearch/template_manager"
 
 module LogStash; module Outputs; class ElasticSearch;
   module Common
+
+    # This module defines common methods that can be reused by alternate elasticsearch output plugins such as the elasticsearch_data_streams output.
+
     attr_reader :client, :hosts
 
     # These codes apply to documents, not at the request level

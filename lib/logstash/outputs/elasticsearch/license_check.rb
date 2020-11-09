@@ -4,10 +4,10 @@ module LogStash
       module LicenseChecker
 
         # This mixin is used to externalize the license checking behaviour of the LogStash::Outputs::ElasticSearch::HttpClient::Pool class.
-        # This mixin used the following Pool methods: get_license, logger. Make sure these are defined in the license_check_mixin_spec.rb
+        # This mixin uses the following Pool methods: get_license, logger. Make sure these are defined in the license_check_mixin_spec.rb.
 
         # Perform a license check
-        # The license_check! methods is the method called from within the Pool class
+        # The license_check! methods is the method called from LogStash::Outputs::ElasticSearch::HttpClient::Pool#healthcheck!
         # @param url [LogStash::Util::SafeURI]
         # @param meta [Hash]
         def license_check!(url, meta)
