@@ -16,7 +16,6 @@ describe LogStash::Outputs::ElasticSearch::HttpClient::Pool do
   let(:manticore_double) { double("manticore a") }
   before(:each) do
 
-    allow(::LogStash::Outputs::ElasticSearch).to receive(:oss?).and_return(oss)
     response_double = double("manticore response").as_null_object
     # Allow healtchecks
     allow(manticore_double).to receive(:head).with(any_args).and_return(response_double)
@@ -26,8 +25,8 @@ describe LogStash::Outputs::ElasticSearch::HttpClient::Pool do
     allow(::Manticore::Client).to receive(:new).and_return(manticore_double)
 
     allow(subject).to receive(:get_es_version).with(any_args).and_return(*es_node_versions)
-    allow(subject).to receive(:oss?).and_return(oss)
-    allow(subject).to receive(:valid_es_license?).and_return(valid_license)
+    allow(subject.license_checker).to receive(:oss?).and_return(oss)
+    allow(subject.license_checker).to receive(:valid_es_license?).and_return(valid_license)
   end
 
   after do
@@ -254,7 +253,7 @@ describe LogStash::Outputs::ElasticSearch::HttpClient::Pool do
           expect(subject.alive_urls_count).to eq(1)
         end
         it "logs a warning" do
-          expect(subject).to receive(:log_license_deprecation_warn).once
+          expect(subject.license_checker).to receive(:log_license_deprecation_warn).once
           subject.update_initial_urls
         end
       end
@@ -265,7 +264,7 @@ describe LogStash::Outputs::ElasticSearch::HttpClient::Pool do
           expect(subject.alive_urls_count).to eq(1)
         end
         it "does not log a warning" do
-          expect(subject).to_not receive(:log_license_deprecation_warn)
+          expect(subject.license_checker).to_not receive(:log_license_deprecation_warn)
           subject.update_initial_urls
         end
       end

@@ -28,9 +28,8 @@ module LogStash; module Outputs; class ElasticSearch; class HttpClient;
       end
     end
 
-    include(LogStash::Outputs::ElasticSearchPoolMixin::LicenseChecker)
-
     attr_reader :logger, :adapter, :sniffing, :sniffer_delay, :resurrect_delay, :healthcheck_path, :sniffing_path, :bulk_path
+    attr_reader :license_checker # license_checker is used by the pool specs
 
     ROOT_URI_PATH = '/'.freeze
     LICENSE_PATH = '/_license'.freeze
@@ -68,6 +67,17 @@ module LogStash; module Outputs; class ElasticSearch; class HttpClient;
       # Holds metadata about all URLs
       @url_info = {}
       @stopping = false
+
+      if options[:license_check_class].nil?
+        # if a license_check_class option was not provided use the plugin local
+        # license checker class in logstash/outputs/elasticsearch/license_check.rb
+        # normally this class is passed from the Commons#build_client method to allow
+        # alternate license checking logic form other implementations like the data streams output.
+        require "logstash/outputs/elasticsearch/license_check"
+        @license_checker = LogStash::ElasticSearchOutputLicenseChecker.new(self, logger)
+      else
+        @license_checker = options[:license_check_class].new(self, logger)
+      end
     end
 
     def start
@@ -275,7 +285,7 @@ module LogStash; module Outputs; class ElasticSearch; class HttpClient;
 
             # license_check in mixed in from LogStash::Outputs::ElasticSearchPoolMixin::LicenseChecker
             # separately defined in the elasticsearch output and the elasticsearch_data_streams output.
-            license_check!(url, meta)
+            @license_checker.license_check!(url, meta)
           end
         rescue HostUnreachableError, BadResponseCodeError => e
           logger.warn("Attempted to resurrect connection to dead ES instance, but got an error.", url: url.sanitized.to_s, error_type: e.class, error: e.message)

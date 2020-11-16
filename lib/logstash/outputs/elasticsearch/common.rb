@@ -79,7 +79,13 @@ module LogStash; module Outputs; class ElasticSearch;
       [action, params, event]
     end
 
-    def build_client
+    # Perform some ES options validations and Build the HttpClient.
+    # Note that this methods may sets the @user, @password, @hosts and @client ivars as a side effect.
+    # @param license_check_class [Class] An optional license checking class that will be used by the Pool class.
+    # @return [HttpClient] the new http client
+    def build_client(license_check_class = nil)
+      params["license_check_class"] = license_check_class
+
       # the following 3 options validation & setup methods are called inside build_client
       # because they must be executed prior to building the client and logstash
       # monitoring and management rely on directly calling build_client
