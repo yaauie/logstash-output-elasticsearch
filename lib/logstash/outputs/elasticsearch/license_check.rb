@@ -1,18 +1,18 @@
 module LogStash
   class ElasticSearchOutputLicenseChecker
 
-    def initialize(pool, logger)
-      @pool = pool
+    def initialize(logger)
       @logger = logger
     end
 
-    # Perform a license check
-    # The license_check! methods is the method called from LogStash::Outputs::ElasticSearch::HttpClient::Pool#healthcheck!
-    # @param url [LogStash::Util::SafeURI]
-    # @param meta [Hash]
-    def license_check!(url, meta)
-      if oss? || valid_es_license?(url)
-        meta[:state] = :alive
+    # Figure out if the provided license is appropriate or not
+    # The appropriate_license? methods is the method called from LogStash::Outputs::ElasticSearch::HttpClient::Pool#healthcheck!
+    # @param url [LogStash::Util::SafeURI] ES node URL
+    # @param license [Hash] ES node deserialized licence document
+    # @return [Boolean] true if provided license is deemed appropriate
+    def appropriate_license?(url, license)
+      if oss? || valid_es_license?(license)
+        true
       else
         # As this version is to be shipped with Logstash 7.x we won't mark the connection as unlicensed
         #
@@ -22,7 +22,7 @@ module LogStash
         # Instead we'll log a deprecation warning and mark it as alive:
         #
         log_license_deprecation_warn(url)
-        meta[:state] = :alive
+        true
       end
     end
 
@@ -32,11 +32,8 @@ module LogStash
     end
 
     # Note that valid_es_license? could be private but is used by the Pool specs
-    def valid_es_license?(url)
-      license = pool.get_license(url)
+    def valid_es_license?(license)
       license.fetch("license", {}).fetch("status", nil) == "active"
-    rescue => e
-      false
     end
 
     # Note that log_license_deprecation_warn could be private but is used by the Pool specs

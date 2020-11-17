@@ -6,15 +6,15 @@ describe LogStash::ElasticSearchOutputLicenseChecker do
 
   # Note that the actual license checking logic is spec'ed in pool_spec.rb
 
-  context "LicenseChecker mixin API required by Pool class" do
+  context "LicenseChecker API required by Pool class" do
     subject { described_class }
 
     it "defines the license_check! methods" do
-      expect(subject.instance_methods).to include(:license_check!)
+      expect(subject.instance_methods).to include(:appropriate_license?)
     end
   end
 
-  context "LicenseChecker mixin API required by Pool specs" do
+  context "LicenseChecker API required by Pool specs" do
     subject { described_class }
 
     it "defines the oss? method" do
@@ -27,14 +27,6 @@ describe LogStash::ElasticSearchOutputLicenseChecker do
 
     it "defines the log_license_deprecation_warn method" do
       expect(subject.instance_methods).to include(:log_license_deprecation_warn)
-    end
-  end
-
-  context "Pool class API required by the LicenseChecker mixin" do
-    subject { LogStash::Outputs::ElasticSearch::HttpClient::Pool }
-
-    it "contains the get_license method" do
-      expect(LogStash::Outputs::ElasticSearch::HttpClient::Pool.instance_methods).to include(:get_license)
     end
   end
 end

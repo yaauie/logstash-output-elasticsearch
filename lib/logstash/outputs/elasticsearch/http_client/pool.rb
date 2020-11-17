@@ -74,9 +74,9 @@ module LogStash; module Outputs; class ElasticSearch; class HttpClient;
         # normally this class is passed from the Commons#build_client method to allow
         # alternate license checking logic form other implementations like the data streams output.
         require "logstash/outputs/elasticsearch/license_check"
-        @license_checker = LogStash::ElasticSearchOutputLicenseChecker.new(self, logger)
+        @license_checker = LogStash::ElasticSearchOutputLicenseChecker.new(logger)
       else
-        @license_checker = options[:license_check_class].new(self, logger)
+        @license_checker = options[:license_check_class].new(logger)
       end
     end
 
@@ -252,9 +252,17 @@ module LogStash; module Outputs; class ElasticSearch; class HttpClient;
       end
     end
 
+    # Retrieve ES node license information
+    # @param url [LogStash::Util::SafeURI] ES node URL
+    # @return [Hash] deserialized license document or empty Hash upon any error
     def get_license(url)
-      response = perform_request_to_url(url, :get, LICENSE_PATH)
-      LogStash::Json.load(response.body)
+      begin
+        response = perform_request_to_url(url, :get, LICENSE_PATH)
+        LogStash::Json.load(response.body)
+      rescue => e
+        logger.error("Unable to get license information", url: url.sanitized.to_s, error_type: e.class, error: e.message)
+        {}
+      end
     end
 
     def health_check_request(url)
@@ -283,9 +291,9 @@ module LogStash; module Outputs; class ElasticSearch; class HttpClient;
               set_new_major_version(major)
             end
 
-            # license_check in mixed in from LogStash::Outputs::ElasticSearchPoolMixin::LicenseChecker
-            # separately defined in the elasticsearch output and the elasticsearch_data_streams output.
-            @license_checker.license_check!(url, meta)
+            license = get_license(url)
+            alive = @license_checker.appropriate_license?(url, license)
+            meta[:state] = alive ? :alive : :unlicensed
           end
         rescue HostUnreachableError, BadResponseCodeError => e
           logger.warn("Attempted to resurrect connection to dead ES instance, but got an error.", url: url.sanitized.to_s, error_type: e.class, error: e.message)

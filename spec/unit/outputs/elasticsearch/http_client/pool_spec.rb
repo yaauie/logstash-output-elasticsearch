@@ -61,6 +61,12 @@ describe LogStash::Outputs::ElasticSearch::HttpClient::Pool do
             expect(url.path).to be_empty
             expect(req_path).to eq("/")
           end
+
+          expect(adapter).to receive(:perform_request) do |url, method, req_path, _, _|
+            expect(method).to eq(:get)
+            expect(url.path).to be_empty
+            expect(req_path).to eq("/_license")
+          end
           subject.healthcheck!
         end
       end
@@ -73,6 +79,12 @@ describe LogStash::Outputs::ElasticSearch::HttpClient::Pool do
             expect(method).to eq(:head)
             expect(url.path).to be_empty
             expect(req_path).to eq(healthcheck_path)
+          end
+
+          expect(adapter).to receive(:perform_request) do |url, method, req_path, _, _|
+            expect(method).to eq(:get)
+            expect(url.path).to be_empty
+            expect(req_path).to eq("/_license")
           end
           subject.healthcheck!
         end
@@ -180,6 +192,7 @@ describe LogStash::Outputs::ElasticSearch::HttpClient::Pool do
     context "with multiple URLs in the list" do
       before :each do
         allow(adapter).to receive(:perform_request).with(anything, :head, subject.healthcheck_path, {}, nil)
+        allow(adapter).to receive(:perform_request).with(anything, :get, "/_license", {}, nil)
       end
       let(:initial_urls) { [ ::LogStash::Util::SafeURI.new("http://localhost:9200"), ::LogStash::Util::SafeURI.new("http://localhost:9201"), ::LogStash::Util::SafeURI.new("http://localhost:9202") ] }
 
