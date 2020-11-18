@@ -9,7 +9,7 @@ describe LogStash::ElasticSearchOutputLicenseChecker do
   context "LicenseChecker API required by Pool class" do
     subject { described_class }
 
-    it "defines the license_check! methods" do
+    it "defines the appropriate_license? methods" do
       expect(subject.instance_methods).to include(:appropriate_license?)
     end
   end

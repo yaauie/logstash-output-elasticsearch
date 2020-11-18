@@ -10,8 +10,11 @@ module LogStash
     # @param url [LogStash::Util::SafeURI] ES node URL
     # @param license [Hash] ES node deserialized licence document
     # @return [Boolean] true if provided license is deemed appropriate
-    def appropriate_license?(url, license)
-      if oss? || valid_es_license?(license)
+    def appropriate_license?(pool, base_url)
+      return true if oss?
+
+      license = pool.get_license(base_url)
+      if valid_es_license?(license)
         true
       else
         # As this version is to be shipped with Logstash 7.x we won't mark the connection as unlicensed
@@ -21,7 +24,7 @@ module LogStash
         #
         # Instead we'll log a deprecation warning and mark it as alive:
         #
-        log_license_deprecation_warn(url)
+        log_license_deprecation_warn(base_url)
         true
       end
     end
