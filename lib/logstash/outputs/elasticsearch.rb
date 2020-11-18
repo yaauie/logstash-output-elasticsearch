@@ -265,7 +265,7 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
     # the license_checking behaviour in the Pool class is externalized in the LogStash::ElasticSearchOutputLicenseChecker
     # class defined in license_check.rb. This license checking is specific to the elasticsearch output here and passed
     # to build_client down to the Pool class.
-    build_client(LogStash::ElasticSearchOutputLicenseChecker)
+    build_client(LogStash::ElasticSearchOutputLicenseChecker.new(logger))
     setup_after_successful_connection
     check_action_validity
     @bulk_request_metrics = metric.namespace(:bulk_requests)

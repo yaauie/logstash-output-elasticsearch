@@ -248,6 +248,38 @@ describe LogStash::Outputs::ElasticSearch::HttpClient::Pool do
     before(:each) do
       allow(subject).to receive(:health_check_request)
     end
+
+    let(:options) do
+      super.merge(:license_checker => license_checker)
+    end
+
+    context 'when LicenseChecker#acceptable_license? returns false' do
+      let(:license_checker) { double('LicenseChecker', :appropriate_license? => false) }
+
+      it 'does not mark the URL as active' do
+        subject.update_initial_urls
+        expect(subject.alive_urls_count).to eq(0)
+      end
+    end
+
+    context 'when LicenseChecker#acceptable_license? returns true' do
+      let(:license_checker) { double('LicenseChecker', :appropriate_license? => true) }
+
+      it 'marks the URL as active' do
+        subject.update_initial_urls
+        expect(subject.alive_urls_count).to eq(1)
+      end
+    end
+  end
+
+  # TODO: extract to ElasticSearchOutputLicenseChecker unit spec
+  describe "license checking with ElasticSearchOutputLicenseChecker" do
+    let(:options) do
+      super().merge(:license_checker => LogStash::ElasticSearchOutputLicenseChecker.new(logger))
+    end
+    before(:each) do
+      allow(subject).to receive(:health_check_request)
+    end
     context "when using default logstash distribution" do
       let(:oss) { false }
       context "if ES doesn't return a valid license" do

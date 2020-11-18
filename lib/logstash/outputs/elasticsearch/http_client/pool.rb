@@ -68,16 +68,7 @@ module LogStash; module Outputs; class ElasticSearch; class HttpClient;
       @url_info = {}
       @stopping = false
 
-      if options[:license_check_class].nil?
-        # if a license_check_class option was not provided use the plugin local
-        # license checker class in logstash/outputs/elasticsearch/license_check.rb
-        # normally this class is passed from the Commons#build_client method to allow
-        # alternate license checking logic form other implementations like the data streams output.
-        require "logstash/outputs/elasticsearch/license_check"
-        @license_checker = LogStash::ElasticSearchOutputLicenseChecker.new(logger)
-      else
-        @license_checker = options[:license_check_class].new(logger)
-      end
+      @license_checker = options.fetch(:license_checker) { LogStash::NoopLicenseChecker::INSTANCE }
     end
 
     def start

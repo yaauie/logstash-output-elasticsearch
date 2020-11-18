@@ -1,4 +1,12 @@
 module LogStash
+  class NoopLicenseChecker
+    INSTANCE = self.new
+
+    def appropriate_license?(pool, base_url)
+      true
+    end
+  end
+
   class ElasticSearchOutputLicenseChecker
 
     def initialize(logger)
