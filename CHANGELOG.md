@@ -1,3 +1,6 @@
+## 11.3.1
+ - Fixes issue with partial ECS v8 introduced in 11.3.0
+
 ## 11.3.0
  - Adds ECS templates [#1048](https://github.com/logstash-plugins/logstash-output-elasticsearch/pull/1048)
    - Adds templates for ECS v1 for Elasticsearch 8.x
